@@ -8,16 +8,31 @@ import { ensureInitialAdmin } from "./auth.js";
 const app = Fastify({ logger: true });
 
 // Registre o tratamento antes das rotas para que todos os módulos o herdem.
-app.setErrorHandler((error, _request, reply) => {
-  if (error.validation) {
-    return reply
-      .code(400)
-      .send({ message: "Dados inválidos", details: error.validation });
+app.setErrorHandler((error: unknown, _request, reply) => {
+  // Verifica se o objeto do erro possui a propriedade "validation".
+  const validation =
+    error !== null &&
+    typeof error === "object" &&
+    "validation" in error
+      ? (error as { validation?: unknown }).validation
+      : undefined;
+
+  if (validation) {
+    return reply.code(400).send({
+      message: "Dados inválidos",
+      details: validation,
+    });
   }
-  app.log.error(error);
-  return reply
-    .code(500)
-    .send({ message: "O servidor não conseguiu concluir a solicitação." });
+
+  if (error instanceof Error) {
+    app.log.error(error);
+  } else {
+    app.log.error({ error });
+  }
+
+  return reply.code(500).send({
+    message: "O servidor não conseguiu concluir a solicitação.",
+  });
 });
 
 const allowedOrigins = (process.env.FRONTEND_ORIGIN ?? "http://localhost:3000")
